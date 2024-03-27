@@ -1,0 +1,448 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TP</title>
+</head>
+<body>
+    <canvas width="900" height="600"></canvas>
+    <script>
+        let leCanvas= document.querySelector("canvas");
+        let ctx = leCanvas.getContext("2d");
+
+        //Images de background au lancement
+        leCanvas.style.backgroundImage="url('images/background-debut.jpeg')";
+
+        //Instructions et règles du jeu
+        ctx.font = "bold 24px Calibri";
+        ctx.textBaseline="bottom";
+        ctx.fillStyle = "black"; 
+        ctx.textAlign="center";
+        ctx.fillText("Utiliser la flèche gauche et la flèche droite du clavier pour déplacer votre chat." , leCanvas.width/2, leCanvas.height/5-15); 
+
+        ctx.font = "bold 24px Calibri";
+        ctx.textBaseline="bottom";
+        ctx.fillStyle = "black"; 
+        ctx.textAlign="center";
+        ctx.fillText("Ramasser 15 poissons sans vous faire attraper par le chien." , leCanvas.width/2, leCanvas.height-150);  
+
+        ctx.font="bold 28px Calibri";
+        ctx.textBaseline="bottom";
+        ctx.fillStyle="black";
+        ctx.textAlign="center";
+        ctx.fillText("Cliquez sur le canvas pour démarrer le jeu.",leCanvas.width/2,leCanvas.height-80);
+
+
+        //Détecter le click de souris pour débuter le jeu
+        document.addEventListener("click",commencerLeJeu,{once:true});
+
+        //Objet pour gérér les flèches du clavier
+        let fleches = {
+            gauche: false,
+            droite: false
+        }
+
+        //Objet pour le chat à contrôller
+        let chat ={
+            img: new Image(),
+            urlImage: "images/arretChat_droit.png",
+            x:0,
+            y:0,
+            largeur:105,
+            hauteur:75,
+            indexVignette:0,
+            nbVignettes:6,
+            sourceX:0,
+            vitesseX:4
+        }
+        //Positionement du chat dans le canvas sur l'axe des Y
+        chat.y= leCanvas.height-chat.hauteur;
+        
+        //Objet chien
+        let chien ={
+            img: new Image(),
+            urlImage: "images/chien_droite.png",
+            x:Math.random() * (leCanvas.width-176),
+            y:0,
+            largeur:176,
+            hauteur:83,
+            indexVignette:0,
+            nbVignettes:5,
+            sourceX:0,
+            vitesseX:4
+        }
+        //Positionement du chien dans le canvas sur l'axe des Y
+        chien.y = leCanvas.height-chien.hauteur;
+
+        //Objets poissons
+        let poissonBleu ={
+            img: new Image(),
+            urlImage: "images/poisson_bleu.png",
+            x:Math.random() * (leCanvas.width-50),
+            y:-50,
+            largeur:50,
+            hauteur:38,
+            estAttrape: false,
+            vitesseY: 3
+        };
+        //Image du poisson
+        poissonBleu.img.src = poissonBleu.urlImage;
+
+        let poissonJaune={
+            img: new Image(),
+            urlImage: "images/poisson_jaune.png",
+            x:Math.random() * (leCanvas.width-50),
+            y:-50,
+            largeur:50,
+            hauteur:38,
+            estAttrape: false,
+            vitesseY:3
+        }
+        //Image du poisson
+        poissonJaune.img.src = poissonJaune.urlImage;
+
+        let poissonRose={
+            img: new Image(),
+            urlImage: "images/poisson_rose.png",
+            x:Math.random() * (leCanvas.width-50),
+            y:-50,
+            largeur:50,
+            hauteur:38,
+            estAttrape: false,
+            vitesseY:3
+        }
+        //Image du poisson
+        poissonRose.img.src = poissonRose.urlImage;
+
+        //Variable pour le score 
+        let score =0;
+
+        //Sons audios
+        let sonChien = new Audio("sons/Dog Bark Sound Effect HD [No Copyright].mp3");
+        let sonCollisionPoisson = new Audio("sons/Minecraft Eating - Sound Effect (HD).mp3");
+        let sonAmbiance = new Audio("sons/AdhesiveWombat - Night Shade  NO COPYRIGHT 8-bit Music.mp3");
+        let sonPerdJeu= new Audio("sons/Angry Cat Meow - Sound Effect.mp3");
+        let sonGagneJeu = new Audio("sons/Cat Evil Laugh.mp3");
+
+        //Tableau qui contient les 4 poissons
+        let lesPoissons = [poissonBleu, poissonJaune, poissonRose];
+        
+        //Actualiser l'affichage du jeu
+        let intervalID = setInterval(actualiserLeJeu, 1000 / 60);
+
+        //Changer l'image du chat lorsqu'il bouge
+        let intervalChatID = setInterval(gererImageChat, 1000/12);
+
+        //Changer l'image du chien lorsqu'il bouge
+        let intervalChienID= setInterval(gereImageDuChien, 1000/12);
+        
+        
+        //Event pour détecter touches du clavier
+        document.addEventListener("keydown", presserTouche);
+        document.addEventListener("keyup", relacherTouche);
+
+///////////////////////////FONCTIONS/////////////////////////////////
+        let jeuCommencer= false;
+        //Fonction pour débuter le jeu
+        function commencerLeJeu(event){
+                jeuCommencer=true;
+
+                //Effacer tout le canvas
+                ctx.clearRect(0, 0, leCanvas.width, leCanvas.height);
+
+                //Paysage comme background
+                leCanvas.style.backgroundImage="url('images/background-jeu.jpg')";
+
+                //Dessiner le chat
+                chat.img.src=chat.urlImage;
+
+                //Dessiner le chien
+                chien.img.src=chien.urlImage;
+            }
+
+        //Fonction pour actualiser le jeu
+        function actualiserLeJeu(){
+            //Effacer le canvas
+            if(chat.img.src !== ""){
+            ctx.clearRect(0, 0, leCanvas.width, leCanvas.height);
+            }
+            
+            if(jeuCommencer){
+                //Déplacer notre chat
+                deplacerChat();
+
+                //Loop et play le son du jeu
+                sonAmbiance.loop=true;
+                sonAmbiance.play();
+
+                //Déplacer les poissons
+                deplacerLesPoissons(); 
+
+                //Déplacer le chien
+                deplacerLeChien();
+
+                //Afficher le score
+                afficherLeScore();
+            }
+            let siColissionAvecPoisson;
+            let siCollisionAvecChien;
+
+            //Si il y a une collision entre le chat et un des poissons
+            //Le score monte de 1
+            for(let unPoisson of lesPoissons){
+                if(siColissionAvecPoisson=detecterCollision(chat, unPoisson) && !unPoisson.estAttrape){
+                    //Son lorsque le chat mange le poisson
+                    sonCollisionPoisson.play();
+                    //On monte le score de 1 
+                    score+=1;
+                    //On change sa valeur estAttrape à true
+                    unPoisson.estAttrape=true;
+                    //On change son image
+                    unPoisson.img.src="images/poisson_mort.png";
+                }
+            }
+            //Detecter si c'est la fin du jeu
+            if(siCollisionAvecChien=detecterCollision(chat,chien)){
+                //Arrêter l'actualisation du jeu
+				clearInterval(intervalID);
+
+                //On arrete le son d'ambiance
+                sonAmbiance.pause();
+
+                //On fait jouer le son de fin
+                sonPerdJeu.play();
+
+                //Afficher text de fin de jeu
+                afficherFinJeuPerd();
+
+                //Pour recommencer le jeu
+                document.addEventListener("click", recommencer);
+
+            }
+            else if(score==15){
+                //On arrête le son ambiance
+                sonAmbiance.pause();
+
+                //Son si on gagne la partie
+                sonGagneJeu.play();
+
+                //Arrêter l'actualisation du jeu
+				clearInterval(intervalID);
+
+                //Afficher text de fin de jeu
+                afficherFinJeuGagne();
+
+                //Pour recommencer le jeu
+                document.addEventListener("click", recommencer);
+            }
+        }
+
+        //Fonction si une touche est appuyée
+        function presserTouche(event){
+            if(jeuCommencer){  
+                if(event.keyCode==39){
+                    //flèche droite
+                    fleches.droite=true;
+                }
+                if(event.keyCode==37){
+                    //fleche gauche
+                    fleches.gauche=true;
+                }
+            }  
+        }
+
+        //Fonction si une touche est relachée
+        function relacherTouche(event){
+            if(jeuCommencer){
+                if(event.keyCode==39){
+                    //flèche droite
+                    fleches.droite=false;
+                    chat.img.src="images/arretChat_droit.png"
+                }
+
+                if(event.keyCode==37){
+                    //flèche gauche
+                    fleches.gauche=false;
+                    chat.img.src="images/arretChat_gauche.png";
+                }
+            }   
+        }
+
+        //Fonction pour déplacer notre chat
+        function deplacerChat(){
+            
+            //Si le chat se déplace vers la droite ou la gauche
+            if(fleches.droite){
+                chat.x+=chat.vitesseX;
+                chat.img.src="images/courseChat_droit.png";
+
+            }
+            else if(fleches.gauche){
+                chat.x-=chat.vitesseX;
+                chat.img.src="images/courseChat_gauche.png";
+            }
+
+            //si chat sort par la droite on le ramène à gauche et vice-versa
+            //à droite
+            if(chat.x>leCanvas.width){
+                chat.x=0-chat.largeur;
+            }
+            //à gauche
+            if(chat.x<0-chat.largeur){
+                chat.x=leCanvas.width;
+            }
+            //Dessiner chat
+            ctx.drawImage(chat.img, chat.sourceX, 0, chat.largeur, chat.hauteur, chat.x, chat.y, chat.largeur, chat.hauteur);
+        }
+
+        //Fonction pour gérer la vignette à afficher pour l'animation du chat
+        function gererImageChat(){
+            if (fleches.droite || fleches.gauche){
+                //Définir la coordonnée sourceX de la vignette à afficher
+                chat.sourceX = chat.indexVignette * chat.largeur;
+
+                //Incrémenter et gérer l'index de la prochaine vignette à afficher
+                chat.indexVignette+=1;
+
+                if(chat.indexVignette==chat.nbVignettes){
+                    chat.indexVignette=0;
+                }
+            }else{
+                chat.indexVignette=0;
+                chat.sourceX=0;
+            }
+        }
+
+        //Fonction pour déplacer les poissons sur l'axe des Y
+        function deplacerLesPoissons(){
+            //Déplacer et dessiner les 3 poissons
+            for(let unPoisson of lesPoissons){
+                //Les poissons se deplacent uniquement sur l'axe des Y
+                unPoisson.y+=unPoisson.vitesseY;
+
+                //Remettre le poisson en haut du canvas s'il le depasse
+                if(unPoisson.y > leCanvas.height){
+                    //Position x aleatoire
+                    unPoisson.x=Math.random() * (leCanvas.width-unPoisson.largeur);
+
+                    //Position Y en dehors du canvas
+                    unPoisson.y = -unPoisson.hauteur;
+
+                    //Remtettre sa valeur attrape a false 
+                    unPoisson.estAttrape=false;
+
+                    //Vitesse aléatoire entre 3 et 6
+                    unPoisson.vitesseY= 3 + Math.round(Math.random() * 3);
+
+                    unPoisson.img.src = unPoisson.urlImage;
+                    
+                }
+                //Puis on dessine chaque poisson
+                ctx.drawImage(unPoisson.img,unPoisson.x,unPoisson.y);
+            }
+        }
+
+        //Fonction pour dessiner et déplacer le chien
+        function deplacerLeChien(){
+            //Ajuste la position X du chien
+            chien.x += chien.vitesseX;
+
+            //On détecter collisions avec les limites du canvas et on inverse la vitesse
+            if(chien.x < 0){
+                chien.vitesseX *= -1;
+                chien.img.src = "images/chien_droite.png";
+                sonChien.play();
+                
+            }
+            else if(chien.x > leCanvas.width- chien.largeur){
+                chien.vitesseX = (4 + Math.round(Math.random() * 4)) * -1;
+                chien.img.src = "images/chien_gauche.png";
+                sonChien.play();
+            }
+
+            //Dessiner feuille sprite du chien
+            ctx.drawImage(
+                chien.img,
+                chien.sourceX,
+                0,
+                chien.largeur,
+                chien.hauteur,
+                chien.x,
+                chien.y,
+                chien.largeur,
+                chien.hauteur
+            )
+        }
+
+        //Fonction pour gérer la vignette à afficher pour l'animation du chien
+        function gereImageDuChien(){
+            //Définir la coordonnée sourceX de la vignette à afficher
+            chien.sourceX = chien.indexVignette* chien.largeur;
+
+            //Incrémenter et gérer l'index de la prochaine vignette à afficher
+            chien.indexVignette+=1;
+            if(chien.indexVignette==chien.nbVignettes){
+                chien.indexVignette=0;
+            }
+
+        }
+        //À compléter: Fonction pour afficher le score
+        function afficherLeScore() {
+            //Style su texte
+            ctx.font = "bold 82px Calibri";
+            ctx.textAlign = "center"
+            ctx.textBaseline = "top";
+            ctx.fillStyle = "#ffe57c";
+            //Écriture du texte pour l'affichage du score
+            ctx.fillText(score,leCanvas.width/2,0);
+           
+        }
+
+        //Text de fin de jeu si gagne
+        function afficherFinJeuGagne() {
+            //Style su texte
+            ctx.font = "bold 60px Calibri";
+            ctx.textAlign = "center"
+            ctx.textBaseline = "top";
+            ctx.fillStyle = "#000";
+
+            //Écriture du texte pour l'affichage du text
+            ctx.fillText("Vous avez gagné!",leCanvas.width/2,leCanvas.height/4);
+            ctx.fillText("Cliquer pour recommencer.",leCanvas.width/2,leCanvas.height/3);
+         
+        }
+
+        //Text de fin de jeu si perd
+        function afficherFinJeuPerd(){
+            //Style su texte
+            ctx.font = "bold 60px Calibri";
+            ctx.textAlign = "center"
+            ctx.textBaseline = "top";
+            ctx.fillStyle = "#000";
+
+            ctx.fillText("Vous avez perdu.",leCanvas.width/2,leCanvas.height/2);
+            ctx.fillText("Vous avez ramassé " + score + " poissons.",leCanvas.width/2,leCanvas.height/2+120);
+            ctx.fillText("Cliquer pour recommencer.",leCanvas.width/2,leCanvas.height/2 + 170);
+        }
+
+        //Fonction pour recommencer le jeu
+        function recommencer() {
+            document.location.reload();
+        }
+
+
+        //Fonction qui détecte si deux objets rectangulaires se touchent
+        function detecterCollision(objet1, objet2) {
+            if (objet1.x < objet2.x + objet2.largeur &&
+                objet1.x + objet1.largeur > objet2.x &&
+                objet1.y < objet2.y + objet2.hauteur &&
+                objet1.y + objet1.hauteur > objet2.y) {
+                return true;
+            } else {
+                return false;
+            }
+        }
+    </script>
+</body>
+</html>
